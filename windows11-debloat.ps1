@@ -4,6 +4,19 @@
 # Fully Non-Interactive
 # =====================================================================
 
+# --------------------------------------------------
+# Ensure Running as Administrator
+# --------------------------------------------------
+
+if (-not ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent() `
+    ).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+
+    Write-Host "Restarting as Administrator..."
+    Start-Process powershell "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
+
 Write-Host ""
 Write-Host "==============================================="
 Write-Host "        Windows 11 Complete Debloat"
@@ -26,16 +39,21 @@ function Remove-Appx($Name) {
 }
 
 # --------------------------------------------------
-# Function: Winget Uninstall (Try winget source first)
+# Function: Winget Uninstall
 # --------------------------------------------------
 
 function Remove-WingetApp($Id) {
     Write-Host "Attempting to remove $Id via winget source..."
 
-    winget uninstall -e --id $Id --source winget --silent --accept-source-agreements 2>$null
+    winget uninstall -e --id $Id --source winget --silent `
+        --accept-source-agreements `
+        --accept-package-agreements 2>$null
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Retrying with msstore source..."
-        winget uninstall -e --id $Id --source msstore --silent --accept-source-agreements 2>$null
+        winget uninstall -e --id $Id --source msstore --silent `
+            --accept-source-agreements `
+            --accept-package-agreements 2>$null
     }
 }
 
@@ -45,7 +63,7 @@ function Remove-WingetApp($Id) {
 
 $AppList = @(
 
-# Copilot / Widgets / Web Experience
+# Copilot / Widgets
 "MicrosoftWindows.Client.WebExperience",
 "Microsoft.Windows.Copilot",
 
@@ -86,7 +104,7 @@ foreach ($App in $AppList) {
 }
 
 # --------------------------------------------------
-# Remove Microsoft Teams (All Variants)
+# Remove Microsoft Teams
 # --------------------------------------------------
 
 Write-Host "Removing Microsoft Teams..."
@@ -97,7 +115,7 @@ Get-AppxPackage -Name "*Teams*" -AllUsers -ErrorAction SilentlyContinue |
 Remove-WingetApp "Microsoft.Teams"
 
 # --------------------------------------------------
-# Remove OneDrive (All Methods)
+# Remove OneDrive
 # --------------------------------------------------
 
 Write-Host "Removing OneDrive..."
@@ -113,7 +131,7 @@ if (Test-Path "$env:SystemRoot\System32\OneDriveSetup.exe") {
 }
 
 # --------------------------------------------------
-# Disable Scheduled Telemetry Tasks
+# Disable Telemetry Scheduled Tasks
 # --------------------------------------------------
 
 Write-Host "Disabling telemetry scheduled tasks..."
@@ -142,40 +160,55 @@ Stop-Service DiagTrack -Force -ErrorAction SilentlyContinue
 Set-Service DiagTrack -StartupType Disabled -ErrorAction SilentlyContinue
 
 # --------------------------------------------------
-# Disable Widgets (Policy)
+# Disable Widgets
 # --------------------------------------------------
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Force | Out-Null
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" -Name "AllowNewsAndInterests" -Value 0 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" `
+    -Name "AllowNewsAndInterests" -Value 0 -Type DWord
 
 # --------------------------------------------------
-# Disable Windows Copilot (Policy)
+# Disable Windows Copilot
 # --------------------------------------------------
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Force | Out-Null
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "TurnOffWindowsCopilot" -Value 1 -Type DWord
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" -Name "SetCopilotHardwareKey" -Value 0 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" `
+    -Name "TurnOffWindowsCopilot" -Value 1 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot" `
+    -Name "SetCopilotHardwareKey" -Value 0 -Type DWord
 
 # --------------------------------------------------
-# Disable Search Suggestions
+# Disable Bing Search (NEW)
 # --------------------------------------------------
 
+Write-Host "Disabling Bing Search integration..."
+
+New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Force | Out-Null
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" `
+    -Name "BingSearchEnabled" -Value 0 -Type DWord
+
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" `
+    -Name "CortanaConsent" -Value 0 -Type DWord
+
+# Also disable search box web suggestions
 New-Item -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" -Force | Out-Null
-Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" -Name "DisableSearchBoxSuggestions" -Value 1 -Type DWord
+Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" `
+    -Name "DisableSearchBoxSuggestions" -Value 1 -Type DWord
 
 # --------------------------------------------------
 # Disable Telemetry Policy
 # --------------------------------------------------
 
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Force | Out-Null
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" `
+    -Name "AllowTelemetry" -Value 0 -Type DWord
 
 # --------------------------------------------------
 # Apply Policy Changes
 # --------------------------------------------------
 
 Write-Host "Updating Group Policy..."
-gpupdate /force
+gpupdate /force | Out-Null
 
 Write-Host ""
 Write-Host "==============================================="
