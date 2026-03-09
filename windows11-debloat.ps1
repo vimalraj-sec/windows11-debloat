@@ -70,14 +70,12 @@ function Remove-WingetApp($Id) {
     Write-Host "Attempting to remove $Id via winget..."
 
     winget uninstall -e --id $Id --source winget --silent `
-        --accept-source-agreements `
-        --accept-package-agreements 2>$null
+        --accept-source-agreements *>$null
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Retrying $Id with msstore source..."
         winget uninstall -e --id $Id --source msstore --silent `
-            --accept-source-agreements `
-            --accept-package-agreements 2>$null
+            --accept-source-agreements *>$null
     }
 }
 
