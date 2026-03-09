@@ -18,6 +18,7 @@
 
 ## How To Run
 1️⃣ Open **PowerShell as Administrator**
+
 2️⃣ Go to the script folder:
 
 ```powershell
